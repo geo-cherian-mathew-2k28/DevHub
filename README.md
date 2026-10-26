@@ -1,6 +1,6 @@
 # DevHub — Full-Stack Docker & Kubernetes Learning Platform
 
-[![CI/CD Build & Verification](https://github.com/YOUR_USERNAME/devhub/actions/workflows/docker-build.yml/badge.svg)](https://github.com/YOUR_USERNAME/devhub/actions)
+[![CI/CD Build & Verification](https://github.com/geo-cherian-mathew-2k28/DevHub/actions/workflows/docker-build.yml/badge.svg)](https://github.com/geo-cherian-mathew-2k28/DevHub/actions)
 [![Docker](https://img.shields.io/badge/Docker-29.2%2B-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-kind-326CE5?logo=kubernetes&logoColor=white)](https://kind.sigs.k8s.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)

@@ -64,7 +64,7 @@ Welcome to **DevHub**! This guide takes you step-by-step through configuring you
 
 1. **Clone the repository:**
    ```powershell
-   git clone https://github.com/YOUR_USERNAME/devhub.git
+   git clone https://github.com/geo-cherian-mathew-2k28/DevHub.git
    cd devhub
    ```
 
