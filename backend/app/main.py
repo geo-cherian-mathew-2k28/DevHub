@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import engine, Base
 from app.api.routes import router as task_router
 from app.api.ai_routes import router as ai_router
+from app.api.pipeline_routes import router as pipeline_router
 
 # Configure logging
 logging.basicConfig(
@@ -94,6 +95,7 @@ def root():
 # Include API routers
 app.include_router(task_router)
 app.include_router(ai_router)
+app.include_router(pipeline_router)
 
 
 if __name__ == "__main__":

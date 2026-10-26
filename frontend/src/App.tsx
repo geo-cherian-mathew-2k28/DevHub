@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Task, TaskStats, TaskPriority, TaskStatus, TaskCreateInput } from './types';
+import { Task, TaskStats, TaskPriority, TaskStatus, TaskCreateInput, Pipeline } from './types';
 import { api } from './api';
 import { DashboardStats } from './components/DashboardStats';
 import { FilterBar } from './components/FilterBar';
 import { TaskItem } from './components/TaskItem';
 import { TaskForm } from './components/TaskForm';
-import { Layers, Loader2, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
+import { PipelineDashboard } from './components/PipelineDashboard';
+import { Layers, Loader2, RefreshCw, AlertCircle, CheckCircle, GitBranch, ListTodo } from 'lucide-react';
 
 export function App() {
+  const [activeTab, setActiveTab] = useState<'pipelines' | 'tasks'>('pipelines');
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<TaskStats>({
     total: 0,
@@ -21,7 +24,7 @@ export function App() {
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | ''>('');
 
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,14 +44,18 @@ export function App() {
       setIsLoading(true);
       setError(null);
 
-      const res = await api.getTasks({
-        status: statusFilter || undefined,
-        priority: priorityFilter || undefined,
-        q: searchQuery.trim() || undefined,
-      });
+      const [res, pipeRes] = await Promise.all([
+        api.getTasks({
+          status: statusFilter || undefined,
+          priority: priorityFilter || undefined,
+          q: searchQuery.trim() || undefined,
+        }),
+        api.getPipelines(),
+      ]);
 
       setTasks(res.items);
       setStats(res.stats);
+      setPipelines(pipeRes.items);
       setSystemOnline(true);
     } catch (err: any) {
       setError(err.message || 'Failed to connect to DevHub backend.');
@@ -174,91 +181,113 @@ export function App() {
         </div>
       )}
 
-      {/* Database Connection Error */}
-      {error && (
-        <div className="alert alert-error" role="alert">
-          <AlertCircle size={18} aria-hidden="true" />
-          <div style={{ flex: 1 }}>
-            <strong>Connection Error:</strong> {error}
-            <div style={{ fontSize: '0.8125rem', marginTop: '0.25rem' }}>
-              Ensure your Docker Compose containers are up: <code>docker compose up -d</code>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={fetchTasks}
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      {/* Navigation Tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('pipelines')}
+          className={`btn ${activeTab === 'pipelines' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <GitBranch size={16} />
+          Container CI/CD Pipelines
+          <span style={{ background: 'rgba(255,255,255,0.2)', padding: '0.1rem 0.4rem', borderRadius: '999px', fontSize: '0.75rem' }}>
+            {pipelines.length}
+          </span>
+        </button>
 
-      {/* Top Metrics Cards */}
-      <DashboardStats stats={stats} />
+        <button
+          type="button"
+          onClick={() => setActiveTab('tasks')}
+          className={`btn ${activeTab === 'tasks' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <ListTodo size={16} />
+          Engineering Tasks & Issues
+          <span style={{ background: 'rgba(255,255,255,0.2)', padding: '0.1rem 0.4rem', borderRadius: '999px', fontSize: '0.75rem' }}>
+            {stats.total}
+          </span>
+        </button>
+      </div>
 
-      {/* Action Controls & Filters */}
-      <FilterBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
-        priorityFilter={priorityFilter}
-        onPriorityChange={setPriorityFilter}
-        onOpenCreate={handleOpenCreate}
-        onClearFilters={handleClearFilters}
-        hasActiveFilters={hasActiveFilters}
-      />
+      {activeTab === 'pipelines' ? (
+        <PipelineDashboard
+          pipelines={pipelines}
+          onRefresh={fetchTasks}
+          onTriggerSuccess={() => {
+            showNotification('New CI/CD container build triggered successfully!');
+            fetchTasks();
+          }}
+        />
+      ) : (
+        <>
+          {/* Top Metrics Cards */}
+          <DashboardStats stats={stats} />
 
-      {/* Main Task List */}
-      <main>
-        {isLoading && tasks.length === 0 ? (
-          <div className="loading-spinner" role="status">
-            <Loader2 size={24} className="spin" aria-hidden="true" />
-            <span>Loading tasks from PostgreSQL database...</span>
-          </div>
-        ) : tasks.length === 0 ? (
-          <div className="empty-state">
-            <h3>No tasks found</h3>
-            <p>
-              {hasActiveFilters
-                ? 'No tasks match your current filter criteria. Try clearing the filters.'
-                : 'Get started by creating your first task in the PostgreSQL database!'}
-            </p>
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ marginTop: '1rem' }}
-                onClick={handleClearFilters}
-              >
-                Clear Filters
-              </button>
+          {/* Action Controls & Filters */}
+          <FilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            statusFilter={statusFilter}
+            onStatusChange={setStatusFilter}
+            priorityFilter={priorityFilter}
+            onPriorityChange={setPriorityFilter}
+            onOpenCreate={handleOpenCreate}
+            onClearFilters={handleClearFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
+
+          {/* Main Task List */}
+          <main>
+            {isLoading && tasks.length === 0 ? (
+              <div className="loading-spinner" role="status">
+                <Loader2 size={24} className="spin" aria-hidden="true" />
+                <span>Loading tasks from PostgreSQL database...</span>
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="empty-state">
+                <h3>No tasks found</h3>
+                <p>
+                  {hasActiveFilters
+                    ? 'No tasks match your current filter criteria. Try clearing the filters.'
+                    : 'Get started by creating your first task in the PostgreSQL database!'}
+                </p>
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ marginTop: '1rem' }}
+                    onClick={handleClearFilters}
+                  >
+                    Clear Filters
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ marginTop: '1rem' }}
+                    onClick={handleOpenCreate}
+                  >
+                    Create First Task
+                  </button>
+                )}
+              </div>
             ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ marginTop: '1rem' }}
-                onClick={handleOpenCreate}
-              >
-                Create First Task
-              </button>
+              <div className="tasks-container" aria-label="Task list">
+                {tasks.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    onEdit={handleOpenEdit}
+                    onDelete={handleDelete}
+                    onStatusChange={handleStatusChange}
+                  />
+                ))}
+              </div>
             )}
-          </div>
-        ) : (
-          <div className="tasks-container" aria-label="Task list">
-            {tasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onEdit={handleOpenEdit}
-                onDelete={handleDelete}
-                onStatusChange={handleStatusChange}
-              />
-            ))}
-          </div>
-        )}
-      </main>
+          </main>
+        </>
+      )}
 
       {/* Create / Edit Modal */}
       <TaskForm

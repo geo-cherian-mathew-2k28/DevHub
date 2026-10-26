@@ -105,6 +105,26 @@ class ApiClient {
       body: JSON.stringify({ title }),
     });
   }
+
+  async getPipelines(): Promise<import('./types').PipelineListResponse> {
+    return this.request<import('./types').PipelineListResponse>('/pipelines');
+  }
+
+  async getPipeline(id: number): Promise<import('./types').Pipeline> {
+    return this.request<import('./types').Pipeline>(`/pipelines/${id}`);
+  }
+
+  async triggerPipeline(data: {
+    repo_url: string;
+    branch?: string;
+    name?: string;
+    commit_message?: string;
+  }): Promise<import('./types').Pipeline> {
+    return this.request<import('./types').Pipeline>('/pipelines/trigger', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const api = new ApiClient();
