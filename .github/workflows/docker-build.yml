@@ -1,0 +1,64 @@
+name: DevHub CI/CD - Build and Verify Images
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    name: Build, Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        # Pinning actions to specific commit SHAs for security hardening
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build Backend Image
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: devhub-api:ci
+          load: true
+
+      - name: Run Backend Tests in Container
+        run: |
+          docker run --rm devhub-api:ci pytest -v
+
+      - name: Build Frontend Image
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: devhub-frontend:ci
+
+      # Optional Publish Step (only triggered on merge to main when secrets exist)
+      - name: Log in to Docker Hub (Optional)
+        if: github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish to Docker Hub (Optional)
+        if: github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != ''
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/devhub-api:latest

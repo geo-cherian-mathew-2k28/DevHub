@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devhub-config
+  namespace: devhub
+  labels:
+    app.kubernetes.io/name: devhub
+data:
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "devhub_db"
+  ENVIRONMENT: "production"
+  PORT: "8000"

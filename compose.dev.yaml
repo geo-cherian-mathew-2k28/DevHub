@@ -1,0 +1,92 @@
+# ==============================================================================
+# DevHub - Development Mode Docker Compose Configuration
+# ==============================================================================
+# Features:
+# - Live source code bind mounts for instant hot reloading without rebuilding images
+# - Backend runs uvicorn with --reload
+# - Frontend runs Vite dev server with Hot Module Replacement (HMR) on port 5173
+# - Database port 5432 exposed to localhost for external GUI tools (DBeaver, TablePlus)
+# ==============================================================================
+
+name: devhub-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: devhub-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devhub_insecure_dev_password_change_in_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-devhub_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - devhub-net-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devhub} -d ${POSTGRES_DB:-devhub_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: devhub-backend-dev
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./backend/migrations:/app/migrations:ro
+      - ./backend/alembic.ini:/app/alembic.ini:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-devhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devhub_insecure_dev_password_change_in_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-devhub_db}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-devhub}:${POSTGRES_PASSWORD:-devhub_insecure_dev_password_change_in_prod}@db:5432/${POSTGRES_DB:-devhub_db}
+      ENVIRONMENT: development
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    networks:
+      - devhub-net-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    image: node:20-alpine
+    container_name: devhub-frontend-dev
+    working_dir: /app
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_BACKEND_URL=http://backend:8000
+    networks:
+      - devhub-net-dev
+
+volumes:
+  postgres_dev_data:
+    name: devhub_postgres_dev_data
+
+networks:
+  devhub-net-dev:
+    name: devhub-dev-network

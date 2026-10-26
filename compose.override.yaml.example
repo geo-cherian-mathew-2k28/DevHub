@@ -1,0 +1,30 @@
+# ==============================================================================
+# DevHub - Docker Compose Override Example
+# ==============================================================================
+# When saved as 'compose.override.yaml', Docker Compose automatically merges
+# this file with 'compose.yaml'.
+#
+# Use this for personal developer preferences without committing changes to git.
+#
+# Example usage:
+#   Windows: Copy-Item compose.override.yaml.example compose.override.yaml
+#   Linux:   cp compose.override.yaml.example compose.override.yaml
+# ==============================================================================
+
+services:
+  # Expose PostgreSQL to host machine for external database viewers (e.g. DBeaver)
+  db:
+    ports:
+      - "5432:5432"
+
+  # Mount local code for fast debugging in the production-like container
+  backend:
+    volumes:
+      - ./backend/app:/app/app:ro
+    environment:
+      LOG_LEVEL: DEBUG
+
+  # Expose alternate frontend port if port 3000 is occupied on your host
+  # frontend:
+  #   ports:
+  #     - "3001:80"

@@ -1,0 +1,90 @@
+# ==============================================================================
+# DevHub - Production-Oriented Multi-Container Docker Compose Specification
+# ==============================================================================
+# Educational Note:
+# - Frontend: Nginx serving static assets on host port 3000, proxying /api to backend:8000
+# - Backend: FastAPI running on port 8000, communicating internally with db:5432
+# - Database: PostgreSQL 16 Alpine, keeping ports INTERNAL to the network for security
+# ==============================================================================
+
+name: devhub
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: devhub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devhub_insecure_dev_password_change_in_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-devhub_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - devhub-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devhub} -d ${POSTGRES_DB:-devhub_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: devhub-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-devhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devhub_insecure_dev_password_change_in_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-devhub_db}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://devhub:devhub_insecure_dev_password_change_in_prod@db:5432/devhub_db}
+      ENVIRONMENT: production
+      PORT: 8000
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}
+    ports:
+      - "8000:8000"
+    networks:
+      - devhub-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: devhub-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    networks:
+      - devhub-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  postgres_data:
+    name: devhub_postgres_data
+
+networks:
+  devhub-net:
+    name: devhub-network
